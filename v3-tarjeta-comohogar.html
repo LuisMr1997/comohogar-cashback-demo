@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Cashback">
+<meta name="theme-color" content="#ffffff">
+<title>Comohogar Cashback · Tarjeta de socio (v3)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens: Comohogar brand (web-front-quipu/src/styles/tokens.css).
+   One app theme for every tier: the tier lives only in the card material and its badge. */
+:root{
+  --ground:#F8F9FA; --surface:#FFFFFF; --raised:#F9FAFB; --line:#E5E7EB; --line-strong:#D1D5DB; --rule:#F0F1F3;
+  --ink:#1A1A2E; --ink-soft:#4A4A4A; --muted:#6B7280; --label:#4B5563; --placeholder:#9CA3AF;
+  --accent:#E07B39;          /* brand orange: bars, ladder, selection marks (graphics, not text) */
+  --accent-soft:#D4A574;     /* brand sand */
+  --accent-text:#A9511B;     /* primary-strong #B85A1F darkened a step so text clears 4.5:1 on #F8F9FA and tints */
+  --accent-grad:linear-gradient(135deg,#E07B39 0%,#D4A574 100%); /* Quipu primary button */
+  --on-accent:#1A1A2E;       /* ink on the gradient: 5.7:1 at its darkest stop (white would be 3:1) */
+  --tint:#F3F4F6; --tint-brand:#FFF5ED; --tint-brand-line:#F6D9C6;
+  --pos:#047857;             /* success #059669 one step darker for AA text; #059669 kept for badges */
+  --neg:#DC2626; --used:#9CA3AF;
+  --focus:#B85A1F;
+  --r-card:16px; --r-panel:14px; --r-ctl:12px;
+  font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:#E5E7EB;color:var(--ink);display:grid;place-items:center;min-height:100vh;-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.45}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit}
+/* Tabular figures only where figures stack in a column */
+/* Figures stay proportional, right-aligned (as in v3) */
+.amt,.lrow .v,.b-row b,.frow .v{font-variant-numeric:normal}
+.sh-rows .v.txt{font-variant-numeric:normal}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:6px}
+
+/* Phone frame */
+.phone{width:390px;height:844px;background:var(--ground);border-radius:46px;overflow:hidden;position:relative;
+  box-shadow:0 0 0 11px #1A1A2E,0 40px 80px -20px rgba(26,26,46,.4);display:flex;flex-direction:column;transition:background-color .4s}
+@media (max-width:480px){
+  body{display:block;background:var(--ground)}
+  .phone{width:100%;height:100dvh;border-radius:0;box-shadow:none}
+}
+.statusbar{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px;font-size:14px;font-weight:600}
+.screen{flex:1;overflow-y:auto;display:none;flex-direction:column;scrollbar-width:none}
+.screen.active{display:flex}
+.screen::-webkit-scrollbar{display:none}
+
+/* Top bar */
+.top{display:flex;justify-content:space-between;align-items:center;padding:6px 18px 14px;gap:12px;flex:none}
+.word{font-weight:700;font-size:17px;letter-spacing:0;display:flex;align-items:center;gap:10px}
+.word .wm{display:block}
+.word small{display:block;font-weight:500;font-size:12px;color:var(--muted);letter-spacing:0}
+.ghost{min-height:44px;padding:0 16px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:14px;font-weight:600}
+@media (hover:hover){.ghost:hover{border-color:var(--line-strong)}}
+.title{padding:6px 18px 12px;flex:none}
+.title h1{font-size:24px;line-height:1.2;font-weight:600;letter-spacing:-.01em}
+.title p{color:var(--muted);font-size:14px;margin-top:2px}
+.body{padding:0 18px 28px;display:flex;flex-direction:column;gap:14px}
+
+/* ============ The card ============ */
+.card-wrap{perspective:1400px}
+.card{display:block;width:100%;aspect-ratio:1.56/1;position:relative;border-radius:var(--r-card);will-change:transform}
+.card:focus-visible{outline-offset:4px;border-radius:var(--r-card)}
+.face{position:absolute;inset:0;border-radius:var(--r-card);overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  display:block;color:var(--c-ink);box-shadow:0 22px 34px -22px rgba(26,26,46,.55),0 2px 5px rgba(26,26,46,.12),inset 0 0 0 1px rgba(255,255,255,.28)}
+/* 2D flip (scaleX squeeze + face swap): no 3D, so iOS Safari shows no mirrored face or flicker */
+.face.back{visibility:hidden}
+.card.flipped .face.front{visibility:hidden}
+.card.flipped .face.back{visibility:visible}
+/* Materials: the card is the one place gradients live (the material itself) */
+/* Metals stay true (silver / gold / platinum) but are tuned to the brand: neutral greys from the Quipu
+   scale, a warmer gold that sits next to #E07B39, platinum graphite pulled toward ink #1A1A2E.
+   Every face carries the same Comohogar orange edge + mark, so the card is Comohogar's whatever the tier. */
+.mat-neutral{--c-ink:#1A1A2E;--c-muted:#4B5563;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.18) 0 1px,rgba(0,0,0,.018) 1px 3px),
+    linear-gradient(140deg,#FCFCFD 0%,#E8E9EC 45%,#F7F7F8 62%,#DCDEE2 100%)}
+.mat-silver{--c-ink:#1A1A2E;--c-muted:#40444F;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.22) 0 1px,rgba(26,26,46,.035) 1px 2px,transparent 2px 3px),
+    linear-gradient(135deg,#F1F2F4 0%,#C9CCD2 36%,#F4F5F6 54%,#AFB3BC 100%)}
+.mat-gold{--c-ink:#33210A;--c-muted:#5C3F14;
+  background:repeating-linear-gradient(90deg,rgba(255,250,230,.2) 0 1px,rgba(90,50,0,.04) 1px 2px,transparent 2px 3px),
+    linear-gradient(135deg,#F6E0A8 0%,#D4A24E 38%,#F2D592 56%,#B47E2E 100%)}
+.mat-platinum{--c-ink:#F3F4F6;--c-muted:#C9CBD3;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0 1px,rgba(0,0,0,.08) 1px 2px,transparent 2px 3px),
+    linear-gradient(135deg,#676A7A 0%,#33344A 40%,#5A5D6E 58%,#1F1F33 100%)}
+/* Brand edge: the one orange element on the metal */
+.face::before,.mini::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,#E07B39 0%,#D4A574 100%)}
+.mini{position:relative;overflow:hidden}
+.mini::before{width:4px}
+.mark{flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--accent-grad);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 1px 2px rgba(26,26,46,.25)}
+.mark svg{width:15px;height:15px;display:block}
+.word .mark{width:30px;height:30px;border-radius:9px}
+.word .mark svg{width:18px;height:18px}
+/* Engraved guilloche lines, bottom-right */
+.face::after{content:"";position:absolute;right:-90px;bottom:-120px;width:320px;height:320px;border-radius:50%;pointer-events:none;
+  background:repeating-radial-gradient(circle,transparent 0 7px,var(--engrave,rgba(255,255,255,.22)) 7px 8px);opacity:.75;
+  -webkit-mask:radial-gradient(circle,#000 30%,transparent 70%);mask:radial-gradient(circle,#000 30%,transparent 70%)}
+.mat-gold .face::after,.face.mat-gold::after{--engrave:rgba(255,245,210,.28)}
+.face.mat-platinum::after{--engrave:rgba(255,255,255,.07)}
+.front-in{position:absolute;inset:0;padding:18px 20px 18px 24px;display:grid;grid-template-rows:auto 1fr auto;z-index:1}
+.c-top{display:flex;justify-content:space-between;align-items:flex-start}
+.c-brand{display:flex;gap:9px;align-items:flex-start;font-weight:700;font-size:16px;letter-spacing:.16em;line-height:1}
+.c-brand .mark{margin-top:-2px}
+.c-brand small{display:block;font-weight:500;font-size:12px;letter-spacing:.02em;color:var(--c-muted);margin-top:5px}
+.c-tier{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px}
+.c-q{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:14px;font-weight:700;border:1.5px solid currentColor;opacity:.8}
+.c-mid{align-self:center}
+.c-lbl{font-size:12px;color:var(--c-muted);font-weight:500}
+.c-amt{font-size:34px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.c-bot{display:flex;justify-content:space-between;align-items:flex-end;gap:10px}
+.c-name{font-size:13px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;line-height:1.3;
+  text-shadow:0 1px 0 rgba(255,255,255,.35)}
+.mat-platinum .c-name{text-shadow:0 1px 0 rgba(0,0,0,.4)}
+.c-id{font-size:14px;letter-spacing:.14em;font-weight:500;margin-top:3px}
+.c-since{text-align:right;font-size:12px;color:var(--c-muted);line-height:1.3;white-space:nowrap}
+.c-since b{display:block;color:var(--c-ink);font-weight:600;font-size:13px}
+
+/* Back face */
+.stripe{position:absolute;left:0;right:0;top:16px;height:26px;background:#1A1A2E;box-shadow:0 3px 0 #E07B39}
+.mat-platinum .stripe{background:#121222}
+.back-in{position:absolute;left:16px;right:12px;top:52px;bottom:12px;border-radius:9px;background:rgba(255,255,255,.9);color:#1A1A2E;
+  padding:10px 12px 10px;display:flex;flex-direction:column;justify-content:space-between;z-index:1}
+.b-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:700}
+.b-head span{font-size:12px;font-weight:500;color:#4B5563}
+.b-rows{display:grid;gap:1px;margin-top:2px}
+.b-row{display:flex;justify-content:space-between;font-size:13px;line-height:18px;color:#4A4A4A}
+.b-row b{font-weight:600;color:#1A1A2E}
+.b-row.tot{border-top:1px solid #D1D5DB;padding-top:3px;margin-top:2px;color:#1A1A2E;font-weight:600}
+.b-row.tot b{font-weight:700}
+.ladder{position:relative;margin-top:6px}
+.l-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;height:6px}
+.l-bar i{border-radius:3px;background:#E5E7EB}
+.l-bar i.on{background:var(--accent)}
+.l-bar i.past{background:var(--accent-soft)}
+.l-mark{position:absolute;top:-4px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
+.l-lbl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-top:4px;font-size:12px;color:#4B5563;line-height:1.2}
+.l-lbl span:nth-child(2){text-align:center}.l-lbl span:nth-child(3){text-align:right}
+.l-lbl b{color:#1A1A2E;font-weight:700}
+
+/* Caption under the card (changes with the side shown) */
+.cap{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:2px 2px 0}
+.cap p{font-size:13.5px;color:var(--muted);line-height:1.45}
+.cap p b{color:var(--ink);font-weight:600}
+.flipbtn{flex:none;min-height:44px;padding:0 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:13.5px;font-weight:600;white-space:nowrap}
+
+/* Panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-panel);padding:16px}
+.p-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.p-h h2{font-size:16px;font-weight:600;letter-spacing:0}
+.p-h span{font-size:12.5px;color:var(--muted)}
+.split{height:12px;border-radius:99px;display:flex;gap:2px;overflow:hidden;background:var(--rule)}
+.split i{height:100%}
+.ledger{margin-top:10px}
+.lrow{display:grid;grid-template-columns:12px 1fr auto;gap:10px;align-items:center;min-height:44px;border-bottom:1px solid var(--rule)}
+.lrow:last-child{border-bottom:0}
+.sw{width:10px;height:10px;border-radius:3px}
+.lrow .k{font-size:14.5px}
+.lrow .k small{color:var(--muted);font-size:12.5px;margin-left:6px}
+.lrow .v{font-size:15px;font-weight:600;text-align:right}
+.lrow.tot .k{font-weight:700}.lrow.tot .v{font-weight:700;font-size:17px;color:var(--accent-text)}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+
+.keys{display:flex;gap:10px;font-size:12.5px;color:var(--muted);white-space:nowrap;flex:none}
+.keys span{display:inline-flex;align-items:center}
+.keys i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}
+#chart svg{display:block;width:100%;height:auto}
+
+.facts{display:grid}
+.frow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 0;border-bottom:1px solid var(--rule)}
+.frow:first-child{padding-top:0}.frow:last-child{border-bottom:0;padding-bottom:0}
+.frow .k{font-size:14.5px}
+.frow .k small{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.frow .v{font-size:17px;font-weight:700;text-align:right;white-space:nowrap}
+
+.sec-h{display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding:0 2px}
+.sec-h h2{font-size:16px;font-weight:600}
+.link{min-height:44px;padding:0 4px;color:var(--accent-text);font-weight:600;font-size:14px}
+
+/* Movement rows */
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-panel);overflow:hidden}
+.mov{width:100%;display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:12px 16px;min-height:64px;border-bottom:1px solid var(--rule)}
+.mov:last-child{border-bottom:0}
+@media (hover:hover){.mov:hover{background:var(--raised)}}
+.mov:focus-visible{outline-offset:-3px;border-radius:0}
+.glyph{font-size:18px;font-weight:600;text-align:center;line-height:1}
+.mov-t{font-weight:600;font-size:15px}
+.mov-s{font-size:12.5px;color:var(--muted);margin-top:1px}
+.amt{font-weight:700;font-size:15px;text-align:right;white-space:nowrap}
+.amt small{display:block;font-weight:500;font-size:12px;color:var(--muted);margin-top:1px}
+.month{font-size:13px;font-weight:600;color:var(--muted);padding:8px 2px 0;text-transform:none}
+.month::first-letter{text-transform:uppercase}
+.empty{padding:28px 16px;color:var(--muted);font-size:14px}
+
+/* Filters: segmented track */
+.seg{display:grid;grid-template-columns:repeat(4,auto);gap:2px;margin:0 18px 10px;padding:3px;border-radius:999px;background:var(--tint);flex:none}
+.seg button{min-height:44px;border-radius:999px;font-size:13.5px;font-weight:600;color:var(--label);text-align:center;padding:0 8px}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(26,26,46,.12),0 0 0 1px var(--tint-brand-line)}
+.seg button span{font-weight:500;color:var(--label);margin-left:3px}
+
+/* Benefits */
+.tiers{display:grid;gap:10px}
+.trow{display:grid;grid-template-columns:62px 1fr auto;gap:14px;align-items:center;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-panel)}
+.trow.current{border:2px solid var(--accent);padding:13px 15px}
+.mini{width:62px;height:40px;border-radius:6px;box-shadow:0 4px 8px -4px rgba(26,26,46,.4),inset 0 0 0 1px rgba(255,255,255,.3)}
+.t-name{font-weight:700;font-size:16px}
+.t-range{font-size:13px;color:var(--muted)}
+.t-you{display:inline-block;margin-top:4px;font-size:12px;font-weight:600;color:var(--accent-text);background:var(--tint-brand);padding:2px 8px;border-radius:999px}
+.t-rate{font-size:26px;font-weight:600;letter-spacing:-.02em;text-align:right}
+.t-rate small{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
+.btn{width:100%;min-height:52px;border-radius:999px;background:var(--accent-grad);color:var(--on-accent);font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn.out{background:var(--surface);color:var(--accent-text);border:1.5px solid var(--accent)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.note{font-size:13px;color:var(--label);line-height:1.55;background:var(--tint);border-radius:12px;padding:12px 14px}
+.note b{color:var(--ink);font-weight:600}
+
+/* Login */
+#login{padding:4px 18px 28px}
+#login .top{padding:6px 0 18px}
+.lcard .c-amt{font-size:22px;letter-spacing:.12em;font-weight:600}
+.lcard .c-amt .ph{color:var(--c-muted);opacity:.55}
+.lhead{margin-top:22px}
+.lhead h1{font-size:26px;line-height:1.15;font-weight:600;letter-spacing:-.015em}
+.lhead p{margin-top:6px;color:var(--muted);font-size:15px;max-width:34ch}
+form{margin-top:18px}
+label.f{font-size:14px;font-weight:600}
+.field{margin-top:8px;display:flex;align-items:center;border:1.5px solid var(--placeholder);background:var(--surface);border-radius:var(--r-ctl);padding:0 14px;height:56px}
+.field:focus-within{border-color:var(--ink)}
+.field.err{border-color:var(--neg)}
+.field input{flex:1;min-width:0;border:0;outline:0;font:inherit;font-size:20px;font-weight:600;letter-spacing:.08em;background:transparent;color:var(--ink);font-variant-numeric:tabular-nums}
+.field input::placeholder{color:var(--muted)}
+.hint{min-height:22px;margin:8px 0 10px;font-size:13.5px;color:var(--muted)}
+.hint.err{color:var(--neg);font-weight:500}
+.spinner{width:18px;height:18px;border:2.5px solid rgba(26,26,46,.25);border-top-color:#1A1A2E;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.demo{margin-top:22px}
+.demo h2{font-size:14px;font-weight:600}
+.demo p{font-size:12.5px;color:var(--muted)}
+.demo-list{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.chip{min-height:44px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-size:13.5px;font-weight:500;text-align:center;font-variant-numeric:tabular-nums}
+@media (hover:hover){.chip:hover{border-color:var(--accent-soft)}}
+
+/* Tab bar */
+.tabbar{flex:none;display:none;grid-template-columns:repeat(3,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 8px 20px}
+.tabbar.show{display:grid}
+.tab{position:relative;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted);border-radius:12px;text-align:center}
+.tab svg{width:22px;height:22px}
+.tab[aria-current="page"]{color:var(--accent-text)}
+.tab[aria-current="page"]::before{content:"";position:absolute;top:-6px;left:50%;width:28px;height:3px;margin-left:-14px;border-radius:0 0 3px 3px;background:var(--accent)}
+.tab[aria-current="page"] svg{stroke-width:2.2}
+
+/* Bottom sheet (floats: shadow allowed) */
+.scrim{position:absolute;inset:0;background:rgba(26,26,46,.45);opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.open{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:22px 22px 0 0;padding:10px 20px 30px;
+  transform:translateY(102%);transition:transform .25s ease;box-shadow:0 -10px 30px rgba(26,26,46,.14);visibility:hidden}
+.sheet.open{transform:none;visibility:visible}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 12px}
+.sh-top{display:flex;justify-content:space-between;align-items:center}
+.sh-top h2{font-size:15px;font-weight:600;color:var(--muted)}
+.sh-amt{font-size:32px;font-weight:600;letter-spacing:-.02em;margin:2px 0 8px}
+.sh-rows .lrow{grid-template-columns:1fr auto}
+.sh-rows .lrow .v{font-weight:600;font-size:14.5px}
+.relnote{margin-top:12px;font-size:14px;line-height:1.5;background:var(--tint-brand);border-radius:12px;padding:12px 14px}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+  /* No 3D travel: swap faces instantly */
+  .card .face.back{visibility:hidden}
+  .card.flipped .face.front{visibility:hidden}
+  .card.flipped .face.back{visibility:visible}
+  .spinner{border-top-color:#1A1A2E}
+}
+  /* real-device-statusbar: on phones use the real status bar instead of the mock */
+  @media (max-width:480px){.statusbar{height:max(12px,env(safe-area-inset-top));padding:0;font-size:0;overflow:hidden}}
+  .chip-tier{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 2px;min-height:52px}
+  .chip-lvl{font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:11.5px;font-weight:700;color:#4b5563}
+  .chip-lvl.lvl-gold{color:#8a5a00}
+  .chip-lvl.lvl-platinum{color:#a9511b}
+  /* mobile-tap-fixes: no grey tap flash on iOS; sheet keeps visible while sliding out */
+  *{-webkit-tap-highlight-color:transparent}
+  .sheet{transition:transform .26s cubic-bezier(.2,.8,.2,1),visibility 0s linear .26s;will-change:transform}
+  .sheet.open{transition:transform .26s cubic-bezier(.2,.8,.2,1),visibility 0s}
+  .sheet.print{transition:visibility 0s}
+  .scrim{will-change:opacity}
+  /* fit-phone: on desktop scale the phone frame to fit the window; touch devices get true full screen */
+  @media (min-width:481px){
+    html,body{height:100%;overflow:hidden}
+    body{display:flex;align-items:center;justify-content:center;min-height:0}
+    .phone{transform:scale(var(--fit,1));transform-origin:center center;flex:none}
+  }
+  @media (pointer:coarse) and (max-width:1024px){
+    html,body{height:auto;overflow:auto}
+    body{display:block;background:var(--ground)}
+    .phone{width:100%;height:100dvh;border-radius:0;box-shadow:none;transform:none}
+    .statusbar{height:max(12px,env(safe-area-inset-top));padding:0;font-size:0;overflow:hidden}
+  }
+  /* pin-app: on phones the app is pinned to the visible viewport; only the screen content scrolls, the tab bar stays put */
+  @media (max-width:480px), (pointer:coarse) and (max-width:1024px){
+    html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+    .phone{position:fixed;inset:0;width:100%;height:100%;border-radius:0;box-shadow:none;transform:none}
+    .screen{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+    .tabbar{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  }
+</style>
+</head>
+<body>
+<div class="phone" id="phone">
+  <div class="statusbar"><span>9:41</span><span aria-hidden="true">100 %</span></div>
+
+  <!-- LOGIN -->
+  <section class="screen active" id="login" aria-labelledby="loginTitle">
+    <div class="top"><div class="word"><span class="mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5"/><path d="M4.5 6.5V13h7V6.5"/></svg></span><span class="wm">Comohogar<small>Club cashback</small></span></div></div>
+    <div class="card-wrap" aria-hidden="true">
+      <div class="card lcard"><div class="face mat-neutral" style="position:absolute">
+        <div class="front-in">
+          <div class="c-top"><div class="c-brand"><span class="mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5"/><path d="M4.5 6.5V13h7V6.5"/></svg></span><span>COMOHOGAR<small>Tarjeta de socio</small></span></div></div>
+          <div class="c-mid"><div class="c-lbl">Cédula</div><div class="c-amt num" id="lcId"></div></div>
+          <div class="c-bot"><div><div class="c-name">Socio Comohogar</div></div><div class="c-since">Sukasa · TodoHogar<br>Salón de Navidad</div></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="lhead">
+      <h1 id="loginTitle">Consulta tu cashback</h1>
+      <p>Ingresa tu cédula para ver tu saldo, tus movimientos y tu nivel de socio.</p>
+    </div>
+    <form id="loginForm" novalidate>
+      <label class="f" for="cedula">Número de cédula</label>
+      <div class="field" id="field"><input id="cedula" inputmode="numeric" autocomplete="off" maxlength="10" placeholder="10 dígitos" aria-describedby="hint"></div>
+      <div class="hint" id="hint" role="status">Sin guiones ni espacios.</div>
+      <button class="btn" id="btnLogin" type="submit" disabled>Consultar</button>
+    </form>
+    <div class="demo">
+      <h2>Cédulas de prueba</h2>
+      <p>Clientes de ejemplo con datos de prueba. Toca una para cargarla.</p>
+      <div class="demo-list" id="demoList"></div>
+    </div>
+  </section>
+
+  <!-- HOME -->
+  <section class="screen" id="home" aria-labelledby="hello">
+    <div class="top">
+      <div class="word"><span class="mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5"/><path d="M4.5 6.5V13h7V6.5"/></svg></span><span class="wm"><span id="hello">Hola</span><small>Club cashback Comohogar</small></span></div>
+      <button class="ghost" data-logout>Salir</button>
+    </div>
+    <div class="body">
+      <div class="card-wrap">
+        <button class="card" id="card" aria-pressed="false" aria-describedby="capTxt">
+          <span class="face front" id="cardFront">
+            <span class="front-in">
+              <span class="c-top"><span class="c-brand"><span class="mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 7.5 8 3l5.5 4.5"/><path d="M4.5 6.5V13h7V6.5"/></svg></span><span>COMOHOGAR<small style="display:block">Socio cashback</small></span></span>
+                <span class="c-tier"><span id="cTier">Silver</span><span class="c-q" aria-hidden="true">?</span></span></span>
+              <span class="c-mid"><span class="c-lbl" style="display:block">Disponible</span><span class="c-amt num" id="cDisp" style="display:block">$0.00</span></span>
+              <span class="c-bot">
+                <span><span class="c-name" id="cName" style="display:block"></span><span class="c-id num" id="cId" style="display:block"></span></span>
+                <span class="c-since">Socio desde<b id="cSince"></b></span>
+              </span>
+            </span>
+          </span>
+          <span class="face back" id="cardBack" aria-hidden="true">
+            <span class="stripe"></span>
+            <span class="back-in" id="backIn"></span>
+          </span>
+        </button>
+      </div>
+      <div class="cap">
+        <p id="capTxt"></p>
+        <button class="flipbtn" id="flipBtn" type="button">Ver cálculo</button>
+      </div>
+
+      <div class="panel" aria-labelledby="whereH">
+        <div class="p-h"><h2 id="whereH">Tu cashback ganado</h2><span id="whereSub"></span></div>
+        <div class="split" id="split" aria-hidden="true"></div>
+        <div class="ledger" id="ledger"></div>
+      </div>
+
+      <div class="panel" aria-labelledby="chartH">
+        <div class="p-h"><h2 id="chartH">Cashback por mes</h2>
+          <span class="keys"><span><i style="background:var(--accent)"></i>Ganado</span><span><i style="background:var(--used)"></i>Usado</span></span></div>
+        <div id="chart"></div>
+      </div>
+
+      <div class="panel" aria-labelledby="factsH">
+        <div class="p-h"><h2 id="factsH">Así usas tu cashback</h2></div>
+        <div class="facts" id="facts"></div>
+      </div>
+
+      <div class="sec-h"><h2>Últimos movimientos</h2><button class="link" data-go="movs">Ver todos</button></div>
+      <div class="list" id="lastList"></div>
+    </div>
+  </section>
+
+  <!-- MOVIMIENTOS -->
+  <section class="screen" id="movs" aria-labelledby="movsH">
+    <div class="title"><h1 id="movsH">Movimientos</h1><p id="movCount"></p></div>
+    <div class="seg" role="group" aria-label="Filtrar movimientos" id="seg">
+      <button data-f="all" aria-pressed="true">Todos</button>
+      <button data-f="gen" aria-pressed="false">Ganado</button>
+      <button data-f="uso" aria-pressed="false">Usado</button>
+      <button data-f="dev" aria-pressed="false">Devoluciones</button>
+    </div>
+    <div class="body" id="movList"></div>
+  </section>
+
+  <!-- BENEFICIOS -->
+  <section class="screen" id="benef" aria-labelledby="benefH">
+    <div class="title"><h1 id="benefH">Beneficios</h1><p>Tu nivel depende de tus compras de los últimos 12 meses.</p></div>
+    <div class="body">
+      <div class="tiers" id="tiers"></div>
+      <button class="btn out" id="tierWhy">¿Por qué estoy en este nivel?</button>
+      <p class="note"><b>Nivel estimado.</b> La data del prototipo no trae el valor de las compras: se estima con el cashback neto (ganado − devoluciones) ÷ 5 %, la tasa base. En producción debe venir del ERP. Niveles y tasas definidos por Marketing.</p>
+    </div>
+  </section>
+
+  <nav class="tabbar" id="tabbar" aria-label="Navegación">
+    <button class="tab" data-go="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2.5"/><path d="M3 10h18"/></svg>Inicio</button>
+    <button class="tab" data-go="movs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg>Movimientos</button>
+    <button class="tab" data-go="benef"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V12M12 20V8M19 20V4"/></svg>Beneficios</button>
+  </nav>
+
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">
+    <div class="grab"></div>
+    <div class="sh-top"><h2 id="sheetTitle"></h2><button class="ghost" id="sheetClose">Cerrar</button></div>
+    <div class="sh-amt num" id="sheetAmt"></div>
+    <div class="sh-rows" id="sheetRows"></div>
+    <p class="relnote" id="sheetRel" hidden></p>
+  </div>
+</div>
+
+<script>
+/* Data: data/cashback.json (from historialclientecashback1.xlsx), embedded for file:// */
+const CLIENTS = [{"id": "1752601813", "nombre": "Mora Vega Lucia Fernanda", "movs": [{"fecha": 45990.86771990741, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA WAYRA", "documento": "040-109-16911", "acumulado": 114.58, "usado": 0.0, "devolucion": 0.0, "saldo": 114.58}, {"fecha": 45998.60199074074, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA WAYRA", "documento": "040-110-319", "acumulado": 0.0, "usado": 0.0, "devolucion": 32.78, "saldo": 81.8}, {"fecha": 45998.60480324074, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA WAYRA", "documento": "040-110-9847", "acumulado": 0.0, "usado": 73.1, "devolucion": 0.0, "saldo": 8.7}], "totales": {"acumulado": 114.58, "usado": 73.1, "devolucion": 32.78, "disponible": 8.7}}, {"id": "1759083015", "nombre": "Paredes Ruiz Daniel Esteban", "movs": [{"fecha": 45991.61601851852, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-113-34077", "acumulado": 73.22, "usado": 0.0, "devolucion": 0.0, "saldo": 73.22}, {"fecha": 45998.67228009259, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA SCALA", "documento": "031-107-47102", "acumulado": 0.0, "usado": 73.22, "devolucion": 0.0, "saldo": 0.0}, {"fecha": 46007.69265046297, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-114-19732", "acumulado": 7.37, "usado": 0.0, "devolucion": 0.0, "saldo": 7.37}, {"fecha": 46010.760879629626, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA SCALA", "documento": "031-102-1498", "acumulado": 0.0, "usado": 0.0, "devolucion": 7.37, "saldo": 0.0}, {"fecha": 46010.77442129629, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-114-19771", "acumulado": 73.22, "usado": 0.0, "devolucion": 0.0, "saldo": 73.22}], "totales": {"acumulado": 153.81, "usado": 73.22, "devolucion": 7.37, "disponible": 73.22}}, {"id": "1766131864", "nombre": "Salazar Andrade Paula", "movs": [{"fecha": 45955.57665509259, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA BOSQUE", "documento": "001-104-86497", "acumulado": 102.14, "usado": 0.0, "devolucion": 0.0, "saldo": 102.14}, {"fecha": 45969.67880787037, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA BOSQUE", "documento": "001-104-86959", "acumulado": 0.0, "usado": 102.14, "devolucion": 0.0, "saldo": 0.0}, {"fecha": 45969.67978009259, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA BOSQUE", "documento": "001-106-43349", "acumulado": 4.51, "usado": 0.0, "devolucion": 0.0, "saldo": 4.51}, {"fecha": 45969.811574074076, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA BOSQUE", "documento": "001-102-1753", "acumulado": 0.0, "usado": 0.0, "devolucion": 4.51, "saldo": 0.0}, {"fecha": 46008.617106481484, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA BOSQUE", "documento": "001-104-88585", "acumulado": 2.06, "usado": 0.0, "devolucion": 0.0, "saldo": 2.06}], "totales": {"acumulado": 108.71, "usado": 102.14, "devolucion": 4.51, "disponible": 2.06}}, {"id": "1709139099", "nombre": "Benitez Cruz Mateo Andres", "movs": [{"fecha": 45957.56517361111, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-106-84446", "acumulado": 9.56, "usado": 0.0, "devolucion": 0.0, "saldo": 9.56}, {"fecha": 45958.47193287037, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA JARDIN", "documento": "003-107-2338", "acumulado": 0.0, "usado": 0.0, "devolucion": 9.56, "saldo": 0.0}, {"fecha": 45958.47341435185, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-107-102406", "acumulado": 9.56, "usado": 0.0, "devolucion": 0.0, "saldo": 9.56}, {"fecha": 45963.427395833336, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA JARDIN", "documento": "003-114-74482", "acumulado": 0.0, "usado": 9.56, "devolucion": 0.0, "saldo": 0.0}, {"fecha": 45988.688935185186, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-107-103400", "acumulado": 6.96, "usado": 0.0, "devolucion": 0.0, "saldo": 6.96}, {"fecha": 46010.51400462963, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-110-85853", "acumulado": 118.0, "usado": 0.0, "devolucion": 0.0, "saldo": 124.96}, {"fecha": 46010.539722222224, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA JARDIN", "documento": "003-103-39194", "acumulado": 0.0, "usado": 48.96, "devolucion": 0.0, "saldo": 76.0}, {"fecha": 46038.53136574074, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA JARDIN", "documento": "003-110-86452", "acumulado": 0.0, "usado": 8.09, "devolucion": 0.0, "saldo": 67.91}, {"fecha": 46039.450833333336, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA JARDIN", "documento": "003-110-86480", "acumulado": 0.0, "usado": 26.6, "devolucion": 0.0, "saldo": 41.31}], "totales": {"acumulado": 144.08, "usado": 93.21, "devolucion": 9.56, "disponible": 41.31}}, {"id": "1796030821", "nombre": "Cordero Lima Sofia", "movs": [{"fecha": 45985.54875, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-110-85204", "acumulado": 41.3, "usado": 0.0, "devolucion": 0.0, "saldo": 41.3}, {"fecha": 45985.55263888889, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA JARDIN", "documento": "003-110-3430", "acumulado": 0.0, "usado": 0.0, "devolucion": 41.3, "saldo": 0.0}, {"fecha": 45985.55587962963, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-110-85206", "acumulado": 41.3, "usado": 0.0, "devolucion": 0.0, "saldo": 41.3}, {"fecha": 45985.65621527778, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA JARDIN", "documento": "003-111-61512", "acumulado": 0.0, "usado": 41.3, "devolucion": 0.0, "saldo": 0.0}, {"fecha": 45988.729849537034, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-114-75090", "acumulado": 6.09, "usado": 0.0, "devolucion": 0.0, "saldo": 6.09}], "totales": {"acumulado": 88.69, "usado": 41.3, "devolucion": 41.3, "disponible": 6.09}}, {"id": "1746281946", "nombre": "Naranjo Pinto Gabriela", "movs": [{"fecha": 45951.749189814815, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-114-74208", "acumulado": 43.21, "usado": 0.0, "devolucion": 0.0, "saldo": 43.21}, {"fecha": 45951.75335648148, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA JARDIN", "documento": "003-115-4192", "acumulado": 0.0, "usado": 0.0, "devolucion": 43.21, "saldo": 0.0}, {"fecha": 45951.7605787037, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-114-74209", "acumulado": 37.21, "usado": 0.0, "devolucion": 0.0, "saldo": 37.21}, {"fecha": 45963.731828703705, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-113-33257", "acumulado": 11.18, "usado": 0.0, "devolucion": 0.0, "saldo": 48.39}, {"fecha": 46002.71871527778, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA BOSQUE", "documento": "001-108-79027", "acumulado": 0.0, "usado": 47.86, "devolucion": 0.0, "saldo": 0.53}], "totales": {"acumulado": 91.6, "usado": 47.86, "devolucion": 43.21, "disponible": 0.53}}, {"id": "1782199358", "nombre": "Vasquez Rios Javier", "movs": [{"fecha": 45957.789502314816, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA BOSQUE", "documento": "001-109-136587", "acumulado": 97.97, "usado": 0.0, "devolucion": 0.0, "saldo": 97.97}, {"fecha": 45958.530856481484, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA BOSQUE", "documento": "001-109-3373", "acumulado": 0.0, "usado": 0.0, "devolucion": 11.61, "saldo": 86.36}, {"fecha": 46007.70361111111, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA BOSQUE", "documento": "001-109-138577", "acumulado": 0.0, "usado": 41.39, "devolucion": 0.0, "saldo": 44.97}], "totales": {"acumulado": 97.97, "usado": 41.39, "devolucion": 11.61, "disponible": 44.97}}, {"id": "1718190935", "nombre": "Quiroga Montes Andrea", "movs": [{"fecha": 45984.83384259259, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-113-33861", "acumulado": 24.34, "usado": 0.0, "devolucion": 0.0, "saldo": 24.34}, {"fecha": 45989.98287037037, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA SCALA", "documento": "031-114-19486", "acumulado": 0.0, "usado": 24.34, "devolucion": 0.0, "saldo": 0.0}, {"fecha": 45994.85565972222, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-106-65334", "acumulado": 18.4, "usado": 0.0, "devolucion": 0.0, "saldo": 18.4}, {"fecha": 45996.56155092592, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-112-58585", "acumulado": 44.82, "usado": 0.0, "devolucion": 0.0, "saldo": 63.22}, {"fecha": 45996.56283564815, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA SCALA", "documento": "031-112-58586", "acumulado": 0.0, "usado": 47.12, "devolucion": 0.0, "saldo": 16.1}, {"fecha": 45999.55931712963, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA SCALA", "documento": "031-112-3167", "acumulado": 0.0, "usado": 0.0, "devolucion": 0.76, "saldo": 15.34}, {"fecha": 45999.559907407405, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA SCALA", "documento": "031-111-3859", "acumulado": 0.0, "usado": 0.0, "devolucion": 1.22, "saldo": 14.12}, {"fecha": 45999.57230324074, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-111-85464", "acumulado": 32.42, "usado": 0.0, "devolucion": 0.0, "saldo": 46.54}, {"fecha": 45999.57435185185, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA SCALA", "documento": "031-111-85465", "acumulado": 0.0, "usado": 46.54, "devolucion": 0.0, "saldo": 0.0}, {"fecha": 45999.81799768518, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA SCALA", "documento": "031-113-34349", "acumulado": 0.52, "usado": 0.0, "devolucion": 0.0, "saldo": 0.52}], "totales": {"acumulado": 120.5, "usado": 118.0, "devolucion": 1.98, "disponible": 0.52}}, {"id": "1778657971", "nombre": "Herrera Solis Carlos Eduardo", "movs": [{"fecha": 45958.71917824074, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-103-38327", "acumulado": 176.74, "usado": 0.0, "devolucion": 0.0, "saldo": 176.74}, {"fecha": 45958.748715277776, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA JARDIN", "documento": "003-103-38328", "acumulado": 430.02, "usado": 0.0, "devolucion": 0.0, "saldo": 606.76}, {"fecha": 45958.760879629626, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA JARDIN", "documento": "003-103-38329", "acumulado": 0.0, "usado": 80.98, "devolucion": 0.0, "saldo": 525.78}, {"fecha": 45964.64979166666, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA BOSQUE", "documento": "001-108-77520", "acumulado": 0.0, "usado": 169.18, "devolucion": 0.0, "saldo": 356.6}, {"fecha": 45983.78892361111, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA BOSQUE", "documento": "001-107-68019", "acumulado": 0.0, "usado": 253.76, "devolucion": 0.0, "saldo": 102.84}, {"fecha": 46002.52445601852, "concepto": "DEVOLUCION (NOTA DE CREDITO)", "local": "SUKASA JARDIN", "documento": "003-103-1926", "acumulado": 0.0, "usado": 0.0, "devolucion": 84.26, "saldo": 18.58}, {"fecha": 46019.7984375, "concepto": "USO DE CASHBACK EN FACTURA", "local": "SUKASA JARDIN", "documento": "003-107-104877", "acumulado": 0.0, "usado": 18.58, "devolucion": 0.0, "saldo": 0.0}, {"fecha": 46021.75046296296, "concepto": "FACTURA QUE GENERA CASHBACK", "local": "SUKASA BOSQUE", "documento": "001-113-40939", "acumulado": 17.9, "usado": 0.0, "devolucion": 0.0, "saldo": 17.9}], "totales": {"acumulado": 624.66, "usado": 522.5, "devolucion": 84.26, "disponible": 17.9}}];
+
+// Demo-only client so the Gold level can be shown (no real client in the data falls in Gold).
+const DEMO_GOLD = { id:'1799999998', nombre:'Socio Demo Gold', demo:true, movs:[
+  { fecha:45962.48, concepto:'FACTURA QUE GENERA CASHBACK', local:'SUKASA JARDIN', documento:'DEMO-001', acumulado:180.40, usado:0, devolucion:0, saldo:180.40 },
+  { fecha:45981.61, concepto:'FACTURA QUE GENERA CASHBACK', local:'SUKASA SCALA', documento:'DEMO-002', acumulado:95.30, usado:0, devolucion:0, saldo:275.70 },
+  { fecha:45995.70, concepto:'USO DE CASHBACK EN FACTURA', local:'SUKASA JARDIN', documento:'DEMO-003', acumulado:0, usado:120.00, devolucion:0, saldo:155.70 },
+  { fecha:46012.55, concepto:'FACTURA QUE GENERA CASHBACK', local:'SUKASA BOSQUE', documento:'DEMO-004', acumulado:42.75, usado:0, devolucion:0, saldo:198.45 },
+  { fecha:46015.43, concepto:'DEVOLUCION (NOTA DE CREDITO)', local:'SUKASA BOSQUE', documento:'DEMO-NC-005', acumulado:0, usado:0, devolucion:14.25, saldo:184.20 },
+], totales:{ acumulado:318.45, usado:120.00, devolucion:14.25, disponible:184.20 } };
+CLIENTS.push(DEMO_GOLD);
+
+const TIERS = [
+  { key:'silver',   name:'Silver',   rate:0.05,  min:0,    max:4999.99 },
+  { key:'gold',     name:'Gold',     rate:0.075, min:5000, max:6499.99 },
+  { key:'platinum', name:'Platinum', rate:0.10,  min:6500, max:Infinity },
+];
+const TYPES = {
+  'FACTURA QUE GENERA CASHBACK':  { k:'gen', title:'Cashback ganado',      g:'+' },
+  'USO DE CASHBACK EN FACTURA':   { k:'uso', title:'Cashback usado',       g:'−' },
+  'DEVOLUCION (NOTA DE CREDITO)': { k:'dev', title:'Devolución de compra', g:'↺' },
+};
+const BASE_RATE = 0.05;
+
+const $ = s => document.querySelector(s);
+const money = n => '$' + n.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+const money0 = n => '$' + n.toLocaleString('en-US', { maximumFractionDigits:0 });
+// Excel serial date -> JS Date (local time)
+const xlDate = s => { const d = new Date(Math.round((s - 25569) * 86400000)); return new Date(d.getTime() + d.getTimezoneOffset()*60000); };
+const fmtDate = d => d.toLocaleDateString('es-EC', { day:'numeric', month:'short' }).replace('.', '');
+const fmtFull = d => d.toLocaleString('es-EC', { day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' });
+const fmtMonth = d => d.toLocaleDateString('es-EC', { month:'long', year:'numeric' });
+const monthYear = d => d.toLocaleDateString('es-EC', { month:'short', year:'numeric' }).replace('.', '');
+const titleCase = s => s.toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase());
+const storeName = s => titleCase(s || '');
+const pctTxt = r => (r * 100).toLocaleString('es-EC') + ' %';
+const maskId = id => id.slice(0, 4) + '•••' + id.slice(-3);
+
+// Names come as "Apellidos Nombres"
+function firstName(full){ const w = full.trim().split(/\s+/); return titleCase(w.length >= 4 ? w[2] : (w[1] || w[0])); }
+function cardName(full){ const w = full.trim().split(/\s+/); return w.length >= 4 ? `${w[2]} ${w[0]}` : (w[1] ? `${w[1]} ${w[0]}` : w[0]); }
+
+// Ecuadorian cédula check digit (modulo 10)
+function validCedula(c){
+  if (!/^\d{10}$/.test(c)) return false;
+  const prov = +c.slice(0,2);
+  if (prov < 1 || (prov > 24 && prov !== 30)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++){ let v = +c[i] * (i % 2 ? 1 : 2); if (v > 9) v -= 9; sum += v; }
+  return (10 - sum % 10) % 10 === +c[9];
+}
+const tierFor = spend => TIERS.find(t => spend >= t.min && spend <= t.max);
+
+let current = null, filter = 'all', lastFocus = null;
+
+/* ---------- Login ---------- */
+const input = $('#cedula'), btn = $('#btnLogin'), hint = $('#hint'), field = $('#field');
+function setHint(msg, err){ hint.textContent = msg; hint.classList.toggle('err', !!err); field.classList.toggle('err', !!err); }
+function paintLoginCard(){
+  const v = input.value, out = [];
+  for (let i = 0; i < 10; i++) out.push(v[i] ? v[i] : '<span class="ph">0</span>');
+  $('#lcId').innerHTML = out.slice(0,4).join('') + ' ' + out.slice(4,7).join('') + ' ' + out.slice(7).join('');
+}
+input.addEventListener('input', () => {
+  input.value = input.value.replace(/\D/g, '');
+  btn.disabled = input.value.length !== 10;
+  setHint('Sin guiones ni espacios.');
+  paintLoginCard();
+});
+$('#loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const c = input.value;
+  if (!validCedula(c)) return setHint('Esta cédula no es válida. Revisa los 10 dígitos.', true);
+  btn.disabled = true; btn.innerHTML = '<i class="spinner" aria-hidden="true"></i>Consultando…';
+  setHint('Buscando tu tarjeta de socio…');
+  setTimeout(() => {
+    btn.innerHTML = 'Consultar'; btn.disabled = false;
+    const cl = CLIENTS.find(x => x.id === c);
+    if (!cl) return setHint('No encontramos cashback para esta cédula. Verifica el número o acércate a un local del grupo Comohogar.', true);
+    login(cl);
+  }, 700);
+});
+// Label each test cédula with its estimated level, ordered Silver → Gold → Platinum.
+const chipTier = c => tierFor((c.totales.acumulado - c.totales.devolucion) / BASE_RATE);
+// One test cédula per level for the demo.
+const DEMO_IDS = ['1759083015', '1799999998', '1778657971'];
+$('#demoList').innerHTML = CLIENTS.filter(c => DEMO_IDS.includes(c.id))
+  .sort((a, b) => TIERS.indexOf(chipTier(a)) - TIERS.indexOf(chipTier(b)) || a.id.localeCompare(b.id))
+  .map(c => `<button type="button" class="chip chip-tier" data-id="${c.id}" title="${titleCase(c.nombre)}">
+    <b class="chip-lvl lvl-${chipTier(c).key}">${chipTier(c).name}${c.demo ? ' · demo' : ''}</b><span>${c.id}</span></button>`).join('');
+$('#demoList').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  input.value = b.dataset.id; btn.disabled = false; paintLoginCard();
+  setHint(titleCase(CLIENTS.find(x => x.id === b.dataset.id).nombre));
+  input.focus();
+});
+paintLoginCard();
+
+function login(cl){
+  current = cl;
+  sessionStorage.setItem('cedula', cl.id);
+  document.documentElement.dataset.tier = tierInfo().tier.key;
+  setFlip(false);
+  renderHome(); filter = 'all'; syncSeg(); renderMovs(); renderTiers();
+  go('home');
+}
+function logout(){
+  current = null; sessionStorage.removeItem('cedula');
+  delete document.documentElement.dataset.tier;
+  input.value = ''; btn.disabled = true; setHint('Sin guiones ni espacios.'); paintLoginCard();
+  closeSheet(); go('login');
+}
+document.querySelectorAll('[data-logout]').forEach(b => b.addEventListener('click', logout));
+
+/* ---------- Navigation ---------- */
+function go(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  $('#tabbar').classList.toggle('show', id !== 'login');
+  document.querySelectorAll('.tab').forEach(t => t.dataset.go === id ? t.setAttribute('aria-current', 'page') : t.removeAttribute('aria-current'));
+  document.getElementById(id).scrollTop = 0;
+}
+document.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) go(g.dataset.go); });
+
+/* ---------- Model ---------- */
+function movView(m){
+  const t = TYPES[m.concepto] || { k:'info', title:titleCase(m.concepto), g:'•' };
+  const amount = m.acumulado || m.usado || m.devolucion;
+  const sign = t.k === 'gen' ? '+' : '−';
+  const cls = t.k === 'gen' ? 'pos' : t.k === 'dev' ? 'neg' : '';
+  return { ...m, t, amount, sign, cls, date: xlDate(m.fecha) };
+}
+function views(){ return current.movs.map(movView).sort((a,b) => b.date - a.date); }
+// Estimated level from the client's own data: net cashback / base rate = net purchases.
+function tierInfo(){
+  const T = current.totales, asc = views().reverse();
+  const net = T.acumulado - T.devolucion;
+  const spend = net / BASE_RATE;
+  const tier = tierFor(spend), next = TIERS[TIERS.indexOf(tier) + 1];
+  return { T, net, spend, tier, next, from: asc[0].date, to: asc[asc.length - 1].date, gens: asc.filter(v => v.t.k === 'gen').length };
+}
+
+/* ---------- Card ---------- */
+const card = $('#card');
+let flipping = null;
+function swapFaces(on){
+  card.classList.toggle('flipped', on);
+  card.setAttribute('aria-pressed', on);
+  $('#cardFront').setAttribute('aria-hidden', on);
+  $('#cardBack').setAttribute('aria-hidden', !on);
+  if (current) paintCaption(on);
+}
+function setFlip(on){
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (flipping) flipping.cancel();
+  if (reduce || !card.animate || card.classList.contains('flipped') === on || !card.offsetParent){ swapFaces(on); return; }
+  const half = 180;
+  flipping = card.animate([{ transform:'scaleX(1)' }, { transform:'scaleX(0.02)' }], { duration:half, easing:'cubic-bezier(.5,0,.9,.6)' });
+  flipping.onfinish = () => {
+    swapFaces(on);
+    flipping = card.animate([{ transform:'scaleX(0.02)' }, { transform:'scaleX(1)' }], { duration:half, easing:'cubic-bezier(.1,.4,.5,1)' });
+    flipping.onfinish = () => { flipping = null; };
+  };
+}
+card.addEventListener('click', () => setFlip(!card.classList.contains('flipped')));
+$('#flipBtn').addEventListener('click', () => setFlip(!card.classList.contains('flipped')));
+
+function paintCaption(back){
+  const i = tierInfo();
+  card.setAttribute('aria-label', back
+    ? `Reverso de la tarjeta: cálculo del nivel ${i.tier.name}. Toca para ver el frente.`
+    : `Tarjeta de socio ${i.tier.name}, disponible ${money(i.T.disponible)}. Toca para ver por qué eres ${i.tier.name}.`);
+  $('#flipBtn').textContent = back ? 'Ver frente' : 'Ver cálculo';
+  $('#capTxt').innerHTML = back
+    ? `Tus ${i.gens} ${i.gens === 1 ? 'compra' : 'compras'} entre ${monthYear(i.from)} y ${monthYear(i.to)} suman unos <b class="num">${money0(i.spend)}</b>`
+      + (i.tier.max === Infinity ? `; desde ${money0(i.tier.min)} eres ${i.tier.name}.` : `, dentro del rango ${i.tier.name} <span style="white-space:nowrap">(${money0(i.tier.min)} – ${money(i.tier.max)})</span>.`)
+      + (i.next ? ` Te faltan <b class="num">${money0(i.next.min - i.spend)}</b> en compras para ${i.next.name} y ganar ${pctTxt(i.next.rate)}.` : ' Ya estás en el nivel más alto.')
+      + ' Las compras devueltas no cuentan. Valor estimado desde tu cashback.'
+    : `Ganas <b>${pctTxt(i.tier.rate)}</b> en cada compra como socio ${i.tier.name} (nivel estimado).`
+      + (i.next ? ` Te faltan <b class="num">${money0(i.next.min - i.spend)}</b> para ${i.next.name}.` : '');
+}
+
+function renderCard(){
+  const i = tierInfo(), asc = views().reverse();
+  const mat = 'mat-' + i.tier.key;
+  ['#cardFront', '#cardBack'].forEach(s => { $(s).className = 'face ' + (s === '#cardFront' ? 'front ' : 'back ') + mat; });
+  $('#cTier').textContent = i.tier.name;
+  $('#cDisp').textContent = money(i.T.disponible);
+  $('#cName').textContent = cardName(current.nombre);
+  $('#cId').textContent = maskId(current.id);
+  $('#cSince').textContent = monthYear(asc[0].date);
+  // Ladder: equal steps; marker placed inside its step (Platinum step drawn up to 2× its minimum)
+  const idx = TIERS.indexOf(i.tier), t = i.tier;
+  const top = t.max === Infinity ? t.min * 2 : t.max;
+  const inStep = Math.min(1, (i.spend - t.min) / (top - t.min));
+  const pos = (idx + inStep) / 3 * 100;
+  $('#backIn').innerHTML = `
+    <span class="b-head"><span style="font-size:13px;font-weight:700;color:#1A1A2E">¿Por qué ${i.tier.name}?</span><span>Estimado · 12 meses</span></span>
+    <span class="b-rows">
+      <span class="b-row"><span>Cashback ganado</span><b class="num">+${money(i.T.acumulado)}</b></span>
+      <span class="b-row"><span>− Devoluciones</span><b class="num">−${money(i.T.devolucion)}</b></span>
+      <span class="b-row"><span>= Neto ÷ ${pctTxt(BASE_RATE)} tasa base</span><b class="num">${money(i.net)}</b></span>
+      <span class="b-row tot"><span>Compras estimadas</span><b class="num">${money(i.spend)}</b></span>
+    </span>
+    <span class="ladder" style="display:block">
+      <span class="l-bar" style="display:grid">${TIERS.map((x, k) => `<i class="${k === idx ? 'on' : k < idx ? 'past' : ''}"></i>`).join('')}</span>
+      <span class="l-mark" style="left:${pos}%"></span>
+      <span class="l-lbl" style="display:grid">${TIERS.map((x, k) => `<span>${k === idx ? `<b>${x.name}</b>` : x.name} ${pctTxt(x.rate)}</span>`).join('')}</span>
+    </span>`;
+}
+
+/* ---------- Home ---------- */
+function renderHome(){
+  const T = current.totales, v = views(), asc = [...v].reverse();
+  $('#hello').textContent = `Hola, ${firstName(current.nombre)}`;
+  renderCard(); paintCaption(false);
+
+  // Where the earned cashback went: used / returned / still available
+  const parts = [
+    ['Usado en compras', T.usado, 'var(--used)', '−', ''],
+    ['Devolución', T.devolucion, 'var(--neg)', '−', 'neg'],
+    ['Disponible', T.disponible, 'var(--accent)', '', ''],
+  ];
+  const pct = x => T.acumulado ? Math.round(x / T.acumulado * 100) : 0;
+  $('#whereSub').textContent = 'Acumulado ' + money(T.acumulado);
+  $('#split').innerHTML = parts.filter(p => p[1] > 0).map(p => `<i style="flex:${p[1]} 1 0;background:${p[2]}"></i>`).join('');
+  $('#ledger').innerHTML =
+    `<div class="lrow"><span></span><span class="k">Acumulado</span><span class="v num pos">+${money(T.acumulado)}</span></div>`
+    + parts.map((p, k) => `<div class="lrow ${k === 2 ? 'tot' : ''}"><i class="sw" style="background:${p[2]}"></i>
+      <span class="k">${p[0]}<small class="num">${pct(p[1])} %</small></span><span class="v num ${p[4]}">${p[3]}${money(p[1])}</span></div>`).join('');
+
+  $('#chart').innerHTML = monthlyChart(asc);
+  $('#facts').innerHTML = facts(asc);
+  $('#lastList').innerHTML = v.slice(0, 4).map((x, i) => movRow(x, i)).join('');
+}
+
+function monthlyChart(asc){
+  const key = d => d.getFullYear() * 12 + d.getMonth();
+  const first = key(asc[0].date), last = key(asc[asc.length - 1].date);
+  const months = [];
+  for (let k = first; k <= last; k++) months.push({ k, gen:0, uso:0 });
+  asc.forEach(v => { const m = months[key(v.date) - first]; m.gen += v.acumulado; m.uso += v.usado; });
+  const W = 320, H = 140, top = 18, bottom = 22, max = Math.max(1, ...months.map(m => Math.max(m.gen, m.uso)));
+  const slot = W / months.length, bw = Math.min(18, slot / 3);
+  const y = val => H - bottom - (val / max) * (H - top - bottom);
+  const bars = months.map((m, i) => {
+    const cx = slot * i + slot / 2;
+    const lbl = new Date(Math.floor(m.k / 12), m.k % 12, 1).toLocaleDateString('es-EC', { month:'short' }).replace('.', '');
+    const bar = (val, x, color) => val > 0
+      ? `<rect x="${x}" y="${y(val)}" width="${bw}" height="${H - bottom - y(val)}" rx="2" fill="${color}"/>
+         <text x="${x + bw / 2}" y="${y(val) - 5}" font-size="11" font-weight="600" text-anchor="middle" fill="#4B5563">${Math.round(val)}</text>` : '';
+    return bar(m.gen, cx - bw - 1, 'var(--accent)') + bar(m.uso, cx + 1, 'var(--used)')
+      + `<text x="${cx}" y="${H - 5}" font-size="12" font-weight="500" text-anchor="middle" fill="#4B5563">${lbl}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cashback ganado y usado por mes, en dólares">
+    <line x1="0" x2="${W}" y1="${H - bottom}" y2="${H - bottom}" stroke="#D1D5DB" stroke-width="1"/>${bars}</svg>`;
+}
+
+function facts(asc){
+  const gens = asc.filter(v => v.t.k === 'gen'), uses = asc.filter(v => v.t.k === 'uso');
+  const T = current.totales;
+  // Days from the most recent earning to each use of cashback
+  const waits = uses.map(u => { const g = gens.filter(x => x.date <= u.date).pop(); return g ? (u.date - g.date) / 86400000 : null; }).filter(x => x !== null);
+  const avgWait = waits.length ? waits.reduce((a, b) => a + b, 0) / waits.length : null;
+  const waitTxt = avgWait === null ? '—' : avgWait < 1 ? 'Mismo día' : `${Math.round(avgWait)} días`;
+  const stores = {};
+  asc.forEach(v => stores[v.local] = (stores[v.local] || 0) + 1);
+  const [fav, favN] = Object.entries(stores).sort((a, b) => b[1] - a[1])[0];
+  const nStores = Object.keys(stores).length;
+  const best = gens.reduce((a, b) => b.acumulado > a.acumulado ? b : a, gens[0]);
+  const row = (k, sub, v, cls = '') => `<div class="frow"><span class="k">${k}<small>${sub}</small></span><span class="v num ${cls}">${v}</span></div>`;
+  return row('Ahorro en compras', `en ${uses.length} ${uses.length === 1 ? 'factura pagada' : 'facturas pagadas'} con cashback`, money(T.usado))
+    + row('Facturas con cashback', `promedio ${money(T.acumulado / gens.length)} por factura`, gens.length)
+    + row('Tu local', `${favN} de ${asc.length} movimientos${nStores > 1 ? ` · ${nStores} locales distintos` : ''}`, storeName(fav).replace('Sukasa ', ''))
+    + row('Tiempo para usarlo', avgWait === null ? 'aún no has usado tu cashback' : 'en promedio desde que lo ganas', waitTxt)
+    + row('Tu mayor cashback', `${storeName(best.local)} · ${fmtFull(best.date)}`, '+' + money(best.acumulado), 'pos');
+}
+
+function movRow(v, i){
+  return `<button class="mov" data-i="${i}">
+    <span class="glyph ${v.cls}" aria-hidden="true">${v.t.g}</span>
+    <span><span class="mov-t" style="display:block">${v.t.title}</span><span class="mov-s" style="display:block">${storeName(v.local)} · ${fmtDate(v.date)}</span></span>
+    <span class="amt num ${v.cls}">${v.sign}${money(v.amount)}<small>Saldo ${money(v.saldo)}</small></span>
+  </button>`;
+}
+
+/* ---------- Movements ---------- */
+function syncSeg(){ document.querySelectorAll('#seg button').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === filter)); }
+function renderMovs(){
+  const all = views();
+  const list = filter === 'all' ? all : all.filter(v => v.t.k === filter);
+  const label = { all:'movimientos', gen:'con cashback ganado', uso:'con cashback usado', dev:'devoluciones' }[filter];
+  $('#movCount').textContent = filter === 'all' ? `${all.length} movimientos registrados` : `${list.length} de ${all.length} · ${label}`;
+  if (!list.length){ $('#movList').innerHTML = '<div class="list"><div class="empty">No tienes movimientos de este tipo.</div></div>'; return; }
+  const groups = {};
+  list.forEach(v => { const k = fmtMonth(v.date); (groups[k] = groups[k] || []).push(v); });
+  $('#movList').innerHTML = Object.entries(groups).map(([m, items]) =>
+    `<div class="month">${m}</div><div class="list">${items.map(v => movRow(v, all.indexOf(v))).join('')}</div>`).join('');
+}
+document.querySelectorAll('#seg button').forEach(f => f.addEventListener('click', () => { filter = f.dataset.f; syncSeg(); renderMovs(); }));
+
+/* ---------- Benefits ---------- */
+function renderTiers(){
+  const { tier } = tierInfo();
+  const range = t => t.max === Infinity ? `${money(t.min)} en adelante` : `${money(t.min)} – ${money(t.max)}`;
+  $('#tiers').innerHTML = TIERS.map(t => `
+    <div class="trow ${t === tier ? 'current' : ''}">
+      <span class="mini mat-${t.key}" aria-hidden="true"></span>
+      <div><div class="t-name">${t.name}</div><div class="t-range num">${range(t)}</div>${t === tier ? '<span class="t-you">Tu nivel · estimado</span>' : ''}</div>
+      <div class="t-rate num">${pctTxt(t.rate)}<small>cashback</small></div>
+    </div>`).join('');
+}
+$('#tierWhy').addEventListener('click', () => { go('home'); setFlip(true); card.focus({ preventScroll:true }); });
+
+/* ---------- Detail sheet ---------- */
+document.addEventListener('click', e => {
+  const r = e.target.closest('.mov'); if (!r) return;
+  const v = views()[+r.dataset.i];
+  lastFocus = r;
+  $('#sheetTitle').textContent = v.t.title;
+  $('#sheetAmt').innerHTML = `<span class="${v.cls}">${v.sign}${money(v.amount)}</span>`;
+  $('#sheetRows').innerHTML = [
+    ['Fecha', fmtFull(v.date)],
+    ['Local', storeName(v.local)],
+    [v.t.k === 'dev' ? 'Nota de crédito' : 'Factura', v.documento],
+    ['Saldo después', money(v.saldo)],
+  ].map(([k, val], n) => `<div class="lrow"><span class="k">${k}</span><span class="v ${n < 3 ? 'txt' : ''}">${val}</span></div>`).join('');
+  const rel = relatedNote(v);
+  $('#sheetRel').hidden = !rel; $('#sheetRel').textContent = rel || '';
+  $('#scrim').classList.add('open'); $('#sheet').classList.add('open');
+  setTimeout(() => $('#sheetClose').focus({ preventScroll:true }), 280);
+});
+function closeSheet(){
+  if (!$('#sheet').classList.contains('open')) return;
+  $('#scrim').classList.remove('open'); $('#sheet').classList.remove('open');
+  if (lastFocus && document.body.contains(lastFocus)) lastFocus.focus({ preventScroll:true });
+}
+// Explains a movement using the client's own history
+function relatedNote(v){
+  const prior = views().filter(x => x.date < v.date);
+  if (v.t.k === 'dev'){
+    const g = prior.find(x => x.t.k === 'gen' && Math.abs(x.acumulado - v.devolucion) < 0.01);
+    return g
+      ? `Devolviste la compra de la factura ${g.documento} (${fmtDate(g.date)}), por eso se descontó todo su cashback.`
+      : 'Devolviste parte de una compra: se descuenta el cashback de los productos devueltos.';
+  }
+  if (v.t.k === 'uso') return `Pagaste ${money(v.usado)} de la factura ${v.documento} con tu cashback.`;
+  if (v.t.k === 'gen') return `Esta compra sumó ${money(v.acumulado)} a tu saldo. Puedes usarlo como descuento en tus próximas compras.`;
+  return null;
+}
+$('#scrim').addEventListener('click', closeSheet);
+$('#sheetClose').addEventListener('click', closeSheet);
+document.addEventListener('keydown', e => e.key === 'Escape' && closeSheet());
+
+/* Restore session on refresh */
+const saved = sessionStorage.getItem('cedula');
+const savedClient = saved && CLIENTS.find(c => c.id === saved);
+if (savedClient) login(savedClient);
+</script>
+<script>
+// fit-phone: scale the 390x844 frame (+10px bezel) to the visible window
+(function(){
+  const ph = document.querySelector('.phone');
+  const fit = () => {
+    const s = Math.min(1, (innerHeight - 32) / 864, (innerWidth - 32) / 410);
+    ph.style.setProperty('--fit', s.toFixed(3));
+  };
+  addEventListener('resize', fit); fit();
+})();
+</script>
+</body>
+</html>
