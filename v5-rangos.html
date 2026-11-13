@@ -76,8 +76,6 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-a
 .s-range .r small{display:block;text-align:right;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
 .s-exp{margin-top:4px;font-size:13.5px;color:var(--muted)}
 .s-exp b{color:var(--ink);font-weight:600}
-.s-next{margin-top:10px;font-size:13.5px;color:var(--muted)}
-.s-next b{color:var(--ink);font-weight:600}
 /* Range scale: three equal steps, marker inside the current one */
 .ladder{position:relative;margin-top:12px}
 .l-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;height:6px}
@@ -278,7 +276,6 @@ label.f{font-size:14px;font-weight:600}
           <span class="r num" id="sRate">5 %<small>cashback</small></span>
         </div>
         <div class="ladder" id="sLadder" aria-hidden="true"></div>
-        <p class="s-next" id="sNext"></p>
       </div>
 
       <div class="detail" id="detail">
@@ -490,9 +487,6 @@ function renderSummary(){
     <span class="l-bar">${TIERS.map((x, k) => `<i class="${k === idx ? 'on' : k < idx ? 'past' : ''}"></i>`).join('')}</span>
     <span class="l-mark" style="left:${pos}%"></span>
     <span class="l-lbl">${TIERS.map((x, k) => `<span>${k === idx ? `<b>${x.name}</b>` : x.name}</span>`).join('')}</span>`;
-  $('#sNext').innerHTML = i.next
-    ? `Te faltan <b class="num">${money0(i.next.min - i.spend)}</b> en compras para ${i.next.name} (${pctTxt(i.next.rate)}).`
-    : 'Estás en el rango más alto.';
 }
 
 /* ---------- Home ---------- */
