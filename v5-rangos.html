@@ -74,18 +74,10 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-a
 .s-range .k b{display:block;color:var(--ink);font-size:17px;font-weight:700}
 .s-range .r{font-size:22px;font-weight:600;letter-spacing:-.01em}
 .s-range .r small{display:block;text-align:right;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
+.s-exp{margin-top:4px;font-size:13.5px;color:var(--muted)}
+.s-exp b{color:var(--ink);font-weight:600}
 .s-next{margin-top:10px;font-size:13.5px;color:var(--muted)}
 .s-next b{color:var(--ink);font-weight:600}
-/* Range scale: three equal steps, marker inside the current one */
-.ladder{position:relative;margin-top:12px}
-.l-bar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;height:6px}
-.l-bar i{border-radius:3px;background:#E5E7EB}
-.l-bar i.on{background:var(--accent)}
-.l-bar i.past{background:var(--accent-soft)}
-.l-mark{position:absolute;top:-4px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
-.l-lbl{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-top:6px;font-size:12px;color:#4B5563;line-height:1.2}
-.l-lbl span:nth-child(2){text-align:center}.l-lbl span:nth-child(3){text-align:right}
-.l-lbl b{color:#1A1A2E;font-weight:700}
 .detail{display:flex;flex-direction:column;gap:14px}
 .mark{flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--accent-grad);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),0 1px 2px rgba(26,26,46,.25)}
@@ -98,8 +90,6 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-a
 .p-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
 .p-h h2{font-size:16px;font-weight:600;letter-spacing:0}
 .p-h span{font-size:12.5px;color:var(--muted)}
-.split{height:12px;border-radius:99px;display:flex;gap:2px;overflow:hidden;background:var(--rule)}
-.split i{height:100%}
 .ledger{margin-top:10px}
 .lrow{display:grid;grid-template-columns:12px 1fr auto;gap:10px;align-items:center;min-height:44px;border-bottom:1px solid var(--rule)}
 .lrow:last-child{border-bottom:0}
@@ -270,18 +260,17 @@ label.f{font-size:14px;font-weight:600}
       <div class="sum" aria-labelledby="sLbl">
         <div class="s-lbl" id="sLbl">Cashback disponible</div>
         <div class="s-amt num" id="sDisp">$0.00</div>
+        <p class="s-exp" id="sExp"></p>
         <div class="s-range">
           <span class="k">Tu rango<b id="sRange">Silver</b></span>
           <span class="r num" id="sRate">5 %<small>cashback</small></span>
         </div>
-        <div class="ladder" id="sLadder" aria-hidden="true"></div>
         <p class="s-next" id="sNext"></p>
       </div>
 
       <div class="detail" id="detail">
       <div class="panel" aria-labelledby="whereH">
         <div class="p-h"><h2 id="whereH">Tu cashback ganado</h2><span id="whereSub"></span></div>
-        <div class="split" id="split" aria-hidden="true"></div>
         <div class="ledger" id="ledger"></div>
       </div>
 
@@ -467,18 +456,19 @@ function tierInfo(){
 /* ---------- Summary ---------- */
 const range = t => t.max === Infinity ? `desde ${money0(t.min)}` : t.min === 0 ? `hasta ${money(t.max)}` : `${money0(t.min)} – ${money(t.max)}`;
 
+// Today in Ecuador (America/Guayaquil) plus n days, as a long Spanish date
+function validUntil(n){
+  const [y, m, d] = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil' }).format(new Date()).split('-').map(Number);
+  const due = new Date(Date.UTC(y, m - 1, d + n));
+  return new Intl.DateTimeFormat('es-EC', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }).format(due);
+}
+
 function renderSummary(){
   const i = tierInfo(), t = i.tier, idx = TIERS.indexOf(t);
   $('#sDisp').textContent = money(i.T.disponible);
   $('#sRange').textContent = t.name;
   $('#sRate').innerHTML = `${pctTxt(t.rate)}<small>cashback</small>`;
-  // Equal steps; Platinum step drawn up to 2x its minimum
-  const top = t.max === Infinity ? t.min * 2 : t.max;
-  const pos = (idx + Math.min(1, (i.spend - t.min) / (top - t.min))) / 3 * 100;
-  $('#sLadder').innerHTML = `
-    <span class="l-bar">${TIERS.map((x, k) => `<i class="${k === idx ? 'on' : k < idx ? 'past' : ''}"></i>`).join('')}</span>
-    <span class="l-mark" style="left:${pos}%"></span>
-    <span class="l-lbl">${TIERS.map((x, k) => `<span>${k === idx ? `<b>${x.name}</b>` : x.name}</span>`).join('')}</span>`;
+  $('#sExp').innerHTML = `Válido hasta el <b>${validUntil(15)}</b>`;
   $('#sNext').innerHTML = i.next
     ? `Te faltan <b class="num">${money0(i.next.min - i.spend)}</b> en compras para ${i.next.name} (${pctTxt(i.next.rate)}).`
     : 'Estás en el rango más alto.';
@@ -498,7 +488,6 @@ function renderHome(){
   ];
   const pct = x => T.acumulado ? Math.round(x / T.acumulado * 100) : 0;
   $('#whereSub').textContent = 'Acumulado ' + money(T.acumulado);
-  $('#split').innerHTML = parts.filter(p => p[1] > 0).map(p => `<i style="flex:${p[1]} 1 0;background:${p[2]}"></i>`).join('');
   $('#ledger').innerHTML =
     `<div class="lrow"><span></span><span class="k">Acumulado</span><span class="v num pos">+${money(T.acumulado)}</span></div>`
     + parts.map((p, k) => `<div class="lrow ${k === 2 ? 'tot' : ''}"><i class="sw" style="background:${p[2]}"></i>
