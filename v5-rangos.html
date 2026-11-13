@@ -90,14 +90,25 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-a
 .p-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
 .p-h h2{font-size:16px;font-weight:600;letter-spacing:0}
 .p-h span{font-size:12.5px;color:var(--muted)}
-.ledger{margin-top:10px}
-.lrow{display:grid;grid-template-columns:12px 1fr auto;gap:10px;align-items:center;min-height:44px;border-bottom:1px solid var(--rule)}
-.lrow:last-child{border-bottom:0}
-.sw{width:10px;height:10px;border-radius:3px}
-.lrow .k{font-size:14.5px}
-.lrow .k small{color:var(--muted);font-size:12.5px;margin-left:6px}
-.lrow .v{font-size:15px;font-weight:600;text-align:right}
-.lrow.tot .k{font-weight:700}.lrow.tot .v{font-weight:700;font-size:17px;color:var(--accent-text)}
+.ledger{margin-top:2px}
+/* Earned breakdown read as a sum: earned − used − returned = available */
+.earn{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding-bottom:14px;border-bottom:1px dashed var(--line-strong)}
+.earn-k{font-size:14px;color:var(--label)}
+.earn-v{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--pos)}
+.flow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.tile{position:relative;background:var(--raised);border:1px solid var(--line);border-radius:var(--r-ctl);padding:12px 12px 11px;display:flex;flex-direction:column;gap:2px}
+.t-ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;margin-bottom:6px}
+.t-ic svg{width:17px;height:17px}
+.t-ic.used{background:#EEF0F3;color:var(--label)}
+.t-ic.ret{background:#FDECEC;color:var(--neg)}
+.t-k{font-size:13px;color:var(--label)}
+.t-v{font-size:18px;font-weight:700;letter-spacing:-.01em}
+.t-p{font-size:12px;color:var(--muted)}
+.result{margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 14px 14px 16px;border-radius:var(--r-ctl);
+  background:var(--tint-brand);border:1px solid var(--tint-brand-line);box-shadow:inset 4px 0 0 var(--accent)}
+.r-k{display:block;font-size:14.5px;font-weight:700;color:var(--ink)}
+.r-p{display:block;font-size:12.5px;color:var(--accent-text);margin-top:1px}
+.r-v{font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--accent-text)}
 .pos{color:var(--pos)}.neg{color:var(--neg)}
 
 
@@ -480,18 +491,21 @@ function renderHome(){
   $('#hello').textContent = `Hola, ${firstName(current.nombre)}`;
   renderSummary();
 
-  // Where the earned cashback went: used / returned / still available
-  const parts = [
-    ['Usado en compras', T.usado, 'var(--used)', '−', ''],
-    ['Devolución', T.devolucion, 'var(--neg)', '−', 'neg'],
-    ['Disponible', T.disponible, 'var(--accent)', '', ''],
-  ];
+  // Earned cashback read as a sum: earned − used − returned = available
   const pct = x => T.acumulado ? Math.round(x / T.acumulado * 100) : 0;
-  $('#whereSub').textContent = 'Acumulado ' + money(T.acumulado);
+  const gens = asc.filter(v => v.t.k === 'gen').length;
+  $('#whereSub').textContent = `${gens} ${gens === 1 ? 'compra' : 'compras'} con cashback`;
+  const ico = {
+    used: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg>',
+    ret: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
+  };
+  const tile = (cls, k, v, valCls) => `<div class="tile"><span class="t-ic ${cls}" aria-hidden="true">${ico[cls]}</span>
+    <span class="t-k">${k}</span><span class="t-v num ${valCls}">−${money(v)}</span><span class="t-p">${pct(v)} % de lo ganado</span></div>`;
   $('#ledger').innerHTML =
-    `<div class="lrow"><span></span><span class="k">Acumulado</span><span class="v num pos">+${money(T.acumulado)}</span></div>`
-    + parts.map((p, k) => `<div class="lrow ${k === 2 ? 'tot' : ''}"><i class="sw" style="background:${p[2]}"></i>
-      <span class="k">${p[0]}<small class="num">${pct(p[1])} %</small></span><span class="v num ${p[4]}">${p[3]}${money(p[1])}</span></div>`).join('');
+    `<div class="earn"><span class="earn-k">Ganaste en total</span><span class="earn-v num">+${money(T.acumulado)}</span></div>
+    <div class="flow">${tile('used', 'Usado en compras', T.usado, '')}${tile('ret', 'Devoluciones', T.devolucion, 'neg')}</div>
+    <div class="result"><span><span class="r-k">Te queda disponible</span><span class="r-p">${pct(T.disponible)} % de lo ganado</span></span>
+    <span class="r-v num">${money(T.disponible)}</span></div>`;
 
 }
 
